@@ -6,6 +6,7 @@ import Platform.Cmd exposing ((!))
 import String
 import Svg exposing (Svg, svg, circle, g, text, text', path)
 import Svg.Attributes exposing (id, width, height, cx, cy, r, x, y, fill, style, viewBox, textAnchor, fontSize, fontWeight, fontFamily, alignmentBaseline, d)
+import Transform exposing (Point)
 
 
 type HvacMode
@@ -53,12 +54,6 @@ centeredText radius content =
         [ text content ]
 
 
-type alias Point =
-    { x : Float
-    , y : Float
-    }
-
-
 ticksOuterRadius : Float -> Float
 ticksOuterRadius radius =
     (radius * 2) / 30
@@ -95,21 +90,12 @@ pointsToPath points =
         |> String.join " "
 
 
-angleToRadians : Float -> Float
-angleToRadians angle =
-    angle * pi / 180
-
-
-rotatePoint : Float -> Float -> Point -> Point
-rotatePoint origin angle point =
-    { x = (point.x - origin) * (cos (angleToRadians angle)) - (point.y - origin) * (sin (angleToRadians angle)) + origin
-    , y = (point.x - origin) * (sin (angleToRadians angle)) + (point.y - origin) * (cos (angleToRadians angle)) + origin
-    }
-
-
 rotatePoints : Int -> Float -> List Point -> List Point
 rotatePoints origin angle points =
-    List.map (rotatePoint (toFloat origin) angle) points
+    points
+        |> List.map (Transform.translatePoint { x = -200, y = -200 })
+        |> List.map (Transform.rotatePoint angle)
+        |> List.map (Transform.translatePoint { x = 200, y = 200 })
 
 
 dialTick : Model -> Int -> Svg msg
@@ -122,11 +108,13 @@ dialTick model num =
             180 - (360 - tickDegrees) / 2
 
         angle =
-            (toFloat num) * (tickDegrees / 100) - offsetDegrees
+            (toFloat num)
+                * (tickDegrees / 100)
+                - offsetDegrees
+                |> Transform.degreesToRadians
     in
         path
-            [ id ("tick-" ++ (toString num))
-            , d (pointsToPath (rotatePoints model.radius angle (tickPoints (toFloat model.radius))))
+            [ d (pointsToPath (rotatePoints model.radius angle (tickPoints (toFloat model.radius))))
             , fill "rgba(255, 255, 255, 0.3)"
             ]
             []
