@@ -35,14 +35,84 @@ type HvacMode
 
 
 type alias Model =
-    { radius : Int
-    , numTicks : Int
+    { targetTemperature : Float
     , hvacMode : HvacMode
     }
 
 
 type Msg
     = NoOp
+
+
+
+--
+-- Configure the layout here
+--
+
+
+diameter : Float
+diameter =
+    400
+
+
+tickDegrees : Float
+tickDegrees =
+    300
+
+
+offsetDegrees : Float
+offsetDegrees =
+    180 - (360 - tickDegrees) / 2
+
+
+numberOfTicks : Float
+numberOfTicks =
+    160
+
+
+radius : Float
+radius =
+    diameter / 2
+
+
+ticksOuterRadius : Float
+ticksOuterRadius =
+    diameter / 30
+
+
+ticksInnerRadius : Float
+ticksInnerRadius =
+    diameter / 8
+
+
+
+--
+-- Polygons
+--
+
+
+regularTick : List Point
+regularTick =
+    [ (Point (radius - 1) ticksOuterRadius)
+    , (Point (radius + 1) ticksOuterRadius)
+    , (Point (radius + 1) ticksInnerRadius)
+    , (Point (radius - 1) ticksInnerRadius)
+    ]
+
+
+largeTick : List Point
+largeTick =
+    [ (Point (radius - 1.5) ticksOuterRadius)
+    , (Point (radius + 1.5) ticksOuterRadius)
+    , (Point (radius + 1.5) (ticksInnerRadius + 20))
+    , (Point (radius - 1.5) (ticksInnerRadius + 20))
+    ]
+
+
+
+--
+-- Drawing logic here
+--
 
 
 dialColor : HvacMode -> String
@@ -58,8 +128,8 @@ dialColor mode =
             "#222"
 
 
-centeredText : Int -> String -> Svg msg
-centeredText radius content =
+centeredText : String -> Svg msg
+centeredText content =
     text'
         [ x (toString radius)
         , y (toString radius)
@@ -71,25 +141,6 @@ centeredText radius content =
         , fontFamily "Helvetica, sans-serif"
         ]
         [ text content ]
-
-
-ticksOuterRadius : Float -> Float
-ticksOuterRadius radius =
-    (radius * 2) / 30
-
-
-ticksInnerRadius : Float -> Float
-ticksInnerRadius radius =
-    (radius * 2) / 8
-
-
-tickPoints : Float -> List Point
-tickPoints radius =
-    [ (Point (radius - 1) (ticksOuterRadius radius))
-    , (Point (radius + 1) (ticksOuterRadius radius))
-    , (Point (radius + 1) (ticksInnerRadius radius))
-    , (Point (radius - 1) (ticksInnerRadius radius))
-    ]
 
 
 pointToPath : Int -> Point -> String
@@ -109,34 +160,27 @@ pointsToPath points =
         |> String.join " "
 
 
-rotatePoints : Int -> Float -> List Point -> List Point
+rotatePoints : Float -> Float -> List Point -> List Point
 rotatePoints origin angle points =
     points
-        |> List.map (Transform.translatePoint { x = -200, y = -200 })
+        |> List.map (Transform.translatePoint { x = -origin, y = -origin })
         |> List.map (Transform.rotatePoint angle)
-        |> List.map (Transform.translatePoint { x = 200, y = 200 })
+        |> List.map (Transform.translatePoint { x = origin, y = origin })
 
 
-dialTick : Model -> Int -> Svg msg
-dialTick model num =
+dialTick : Int -> Svg msg
+dialTick tickNumber =
     let
-        tickDegrees =
-            300
-
-        offsetDegrees =
-            180 - (360 - tickDegrees) / 2
-
         angle =
-            (toFloat num)
-                * (tickDegrees / 100)
+            (toFloat tickNumber)
+                * (tickDegrees / numberOfTicks)
                 - offsetDegrees
                 |> Transform.degreesToRadians
     in
         path
             [ d
-                (toFloat model.radius
-                    |> tickPoints
-                    |> rotatePoints model.radius angle
+                (regularTick
+                    |> rotatePoints radius angle
                     |> pointsToPath
                 )
             , fill "rgba(255, 255, 255, 0.3)"
@@ -144,17 +188,28 @@ dialTick model num =
             []
 
 
-dialTicks : Model -> Svg msg
-dialTicks model =
+dialTicks : Svg msg
+dialTicks =
     g []
-        ([0..(model.numTicks - 1)]
-            |> List.map (dialTick model)
+        ([0..(round numberOfTicks - 1)]
+            |> List.map dialTick
         )
+
+
+displayTemperature : Float -> String
+displayTemperature temperature =
+    (toString temperature) ++ "°C"
+
+
+
+--
+-- Elm boilerplate stuff
+--
 
 
 init : ( Model, Cmd Msg )
 init =
-    (Model 200 100 Off) ! []
+    (Model 18.4 Off) ! []
 
 
 view : Model -> Html Msg
@@ -162,18 +217,18 @@ view model =
     svg
         [ width "100%"
         , height "100%"
-        , viewBox ("0 0 " ++ (toString (model.radius * 2)) ++ " " ++ (toString (model.radius * 2)))
+        , viewBox ("0 0 " ++ (toString diameter) ++ " " ++ (toString diameter))
         ]
         [ circle
-            [ cx (toString model.radius)
-            , cy (toString model.radius)
-            , r (toString model.radius)
+            [ cx (toString radius)
+            , cy (toString radius)
+            , r (toString radius)
             , fill (dialColor model.hvacMode)
             , style "transition: fill 0.5s"
             ]
             []
-        , dialTicks model
-        , centeredText model.radius "18°C"
+        , dialTicks
+        , centeredText (displayTemperature model.targetTemperature)
         ]
 
 
