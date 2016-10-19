@@ -5,8 +5,27 @@ import Html.App exposing (program)
 import Platform.Cmd exposing ((!))
 import String
 import Svg exposing (Svg, svg, circle, g, text, text', path)
-import Svg.Attributes exposing (id, width, height, cx, cy, r, x, y, fill, style, viewBox, textAnchor, fontSize, fontWeight, fontFamily, alignmentBaseline, d)
 import Transform exposing (Point)
+import Svg.Attributes
+    exposing
+        ( id
+        , width
+        , height
+        , cx
+        , cy
+        , r
+        , x
+        , y
+        , fill
+        , style
+        , viewBox
+        , textAnchor
+        , fontSize
+        , fontWeight
+        , fontFamily
+        , alignmentBaseline
+        , d
+        )
 
 
 type HvacMode
@@ -114,7 +133,12 @@ dialTick model num =
                 |> Transform.degreesToRadians
     in
         path
-            [ d (pointsToPath (rotatePoints model.radius angle (tickPoints (toFloat model.radius))))
+            [ d
+                (toFloat model.radius
+                    |> tickPoints
+                    |> rotatePoints model.radius angle
+                    |> pointsToPath
+                )
             , fill "rgba(255, 255, 255, 0.3)"
             ]
             []
@@ -123,7 +147,9 @@ dialTick model num =
 dialTicks : Model -> Svg msg
 dialTicks model =
     g []
-        (List.map (dialTick model) [0..model.numTicks])
+        ([0..(model.numTicks - 1)]
+            |> List.map (dialTick model)
+        )
 
 
 init : ( Model, Cmd Msg )
