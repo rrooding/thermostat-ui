@@ -36,6 +36,7 @@ type HvacMode
 
 type alias Model =
     { targetTemperature : Float
+    , ambientTemperature : Float
     , hvacMode : HvacMode
     }
 
@@ -46,7 +47,7 @@ type Msg
 
 
 --
--- Configure the layout here
+-- Configure the layout/settings here
 --
 
 
@@ -83,6 +84,26 @@ ticksOuterRadius =
 ticksInnerRadius : Float
 ticksInnerRadius =
     diameter / 8
+
+
+minimumTemperature : Float
+minimumTemperature =
+    10
+
+
+maximumTemperature : Float
+maximumTemperature =
+    30
+
+
+temperatureRange : Float
+temperatureRange =
+    maximumTemperature - minimumTemperature
+
+
+ambientTextShiftDegrees : Float
+ambientTextShiftDegrees =
+    6
 
 
 
@@ -168,37 +189,91 @@ rotatePoints origin angle points =
         |> List.map (Transform.translatePoint { x = origin, y = origin })
 
 
-dialTick : Int -> Svg msg
-dialTick tickNumber =
+dialTick : Int -> Int -> Int -> Svg msg
+dialTick min max tickNumber =
     let
         angle =
             (toFloat tickNumber)
                 * (tickDegrees / numberOfTicks)
                 - offsetDegrees
                 |> Transform.degreesToRadians
+
+        tick =
+            if tickNumber == min || tickNumber == max then
+                largeTick
+            else
+                regularTick
+
+        color =
+            if tickNumber >= min && tickNumber <= max then
+                "rgba(255, 255, 255, 0.8)"
+            else
+                "rgba(255, 255, 255, 0.3)"
     in
         path
             [ d
-                (regularTick
+                (tick
                     |> rotatePoints radius angle
                     |> pointsToPath
                 )
-            , fill "rgba(255, 255, 255, 0.3)"
+            , fill color
             ]
             []
 
 
-dialTicks : Svg msg
-dialTicks =
-    g []
-        ([0..(round numberOfTicks - 1)]
-            |> List.map dialTick
-        )
+dialTicks : Model -> Svg msg
+dialTicks model =
+    let
+        actualMinValue =
+            List.minimum [ model.ambientTemperature, model.targetTemperature ]
+                |> Maybe.withDefault minimumTemperature
+
+        actualMaxValue =
+            List.maximum [ model.ambientTemperature, model.targetTemperature ]
+                |> Maybe.withDefault maximumTemperature
+
+        min =
+            round ((actualMinValue - minimumTemperature) / temperatureRange * numberOfTicks)
+
+        max =
+            round ((actualMaxValue - minimumTemperature) / temperatureRange * numberOfTicks)
+    in
+        g []
+            ([0..(round numberOfTicks - 1)]
+                |> List.map (dialTick min max)
+            )
 
 
 displayTemperature : Float -> String
 displayTemperature temperature =
     (toString temperature) ++ "°C"
+
+
+ambientTextShift : Model -> Float
+ambientTextShift model =
+    if model.ambientTemperature > model.targetTemperature then
+        ambientTextShiftDegrees
+    else
+        -ambientTextShiftDegrees
+
+
+ambientTextPosition : Model -> Point
+ambientTextPosition model =
+    let
+        angle =
+            tickDegrees
+                * (model.ambientTemperature - minimumTemperature)
+                / temperatureRange
+                - offsetDegrees
+                + ambientTextShift model
+                |> Transform.degreesToRadians
+    in
+        { x = radius
+        , y = (ticksOuterRadius - (ticksOuterRadius - ticksInnerRadius) / 2)
+        }
+            |> Transform.translatePoint { x = -radius, y = -radius }
+            |> Transform.rotatePoint angle
+            |> Transform.translatePoint { x = radius, y = radius }
 
 
 
@@ -209,7 +284,7 @@ displayTemperature temperature =
 
 init : ( Model, Cmd Msg )
 init =
-    (Model 18.4 Off) ! []
+    (Model 15.5 15 Off) ! []
 
 
 view : Model -> Html Msg
@@ -227,8 +302,19 @@ view model =
             , style "transition: fill 0.5s"
             ]
             []
-        , dialTicks
+        , dialTicks model
         , centeredText (displayTemperature model.targetTemperature)
+        , text'
+            [ x (toString (ambientTextPosition model).x)
+            , y (toString (ambientTextPosition model).y)
+            , fill "white"
+            , textAnchor "middle"
+            , alignmentBaseline "central"
+            , fontSize "15px"
+            , fontWeight "bold"
+            , fontFamily "Helvetica, sans-serif"
+            ]
+            [ text (displayTemperature model.ambientTemperature) ]
         ]
 
 
