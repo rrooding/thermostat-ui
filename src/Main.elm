@@ -3,7 +3,7 @@ module Main exposing (..)
 import Html exposing (Html)
 import Html.App exposing (program)
 import Platform.Cmd exposing ((!))
-import TouchEvents as Touch
+import TouchEvents as Touch exposing (Direction(..))
 import String
 import Svg exposing (Svg, svg, circle, g, text, text', path)
 import Transform exposing (Point)
@@ -39,6 +39,7 @@ type alias Model =
     { targetTemperature : Float
     , ambientTemperature : Float
     , hvacMode : HvacMode
+    , lastTouchPositionY : Maybe Float
     }
 
 
@@ -281,13 +282,27 @@ ambientTextPosition model =
 
 
 --
+-- TouchEvent stuff
+--
+
+
+getDirectionY : Float -> Float -> Direction
+getDirectionY start end =
+    if start > end then
+        Up
+    else
+        Down
+
+
+
+--
 -- Elm boilerplate stuff
 --
 
 
 init : ( Model, Cmd Msg )
 init =
-    (Model 15.5 15 Off) ! []
+    (Model 15.5 15 Off Nothing) ! []
 
 
 view : Model -> Html Msg
@@ -328,10 +343,35 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         OnTouchStart touchEvent ->
-            { model | targetTemperature = model.targetTemperature + 0.5 } ! []
+            { model | lastTouchPositionY = Just touchEvent.clientY } ! []
 
-        _ ->
-            model ! []
+        OnTouchMove touchEvent ->
+            let
+                _ =
+                    Debug.log "Move: " touchEvent
+
+                direction =
+                    model.lastTouchPositionY `Maybe.andThen` (\y -> Just <| getDirectionY y touchEvent.clientY)
+
+                change =
+                    case direction of
+                        Just Up ->
+                            0.5
+
+                        Just Down ->
+                            -0.5
+
+                        _ ->
+                            0
+            in
+                { model | targetTemperature = model.targetTemperature + change, lastTouchPositionY = Just touchEvent.clientY } ! []
+
+        OnTouchEnd touchEvent ->
+            let
+                _ =
+                    Debug.log "End: " touchEvent
+            in
+                model ! []
 
 
 main : Program Never
