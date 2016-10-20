@@ -3,6 +3,7 @@ module Main exposing (..)
 import Html exposing (Html)
 import Html.App exposing (program)
 import Platform.Cmd exposing ((!))
+import TouchEvents as Touch
 import String
 import Svg exposing (Svg, svg, circle, g, text, text', path)
 import Transform exposing (Point)
@@ -42,7 +43,9 @@ type alias Model =
 
 
 type Msg
-    = NoOp
+    = OnTouchStart Touch.Touch
+    | OnTouchMove Touch.Touch
+    | OnTouchEnd Touch.Touch
 
 
 
@@ -293,6 +296,9 @@ view model =
         [ width "100%"
         , height "100%"
         , viewBox ("0 0 " ++ (toString diameter) ++ " " ++ (toString diameter))
+        , Touch.onTouchStart OnTouchStart
+        , Touch.onTouchMove OnTouchMove
+        , Touch.onTouchEnd OnTouchEnd
         ]
         [ circle
             [ cx (toString radius)
@@ -320,7 +326,12 @@ view model =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    model ! []
+    case msg of
+        OnTouchStart touchEvent ->
+            { model | targetTemperature = model.targetTemperature + 0.5 } ! []
+
+        _ ->
+            model ! []
 
 
 main : Program Never
