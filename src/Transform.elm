@@ -9,7 +9,7 @@ type alias Point =
 
 {-| Convert angular measures from degrees to radians.
 
-    degreesToRadians 15 == 0.2617993878
+    degreesToRadians 15 == 0.2617993877991494
 -}
 degreesToRadians : Float -> Float
 degreesToRadians degrees =
