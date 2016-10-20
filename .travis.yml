@@ -2,10 +2,9 @@ language: node_js
 node_js:
   - "0.12"
 before_script:
-  - cd tests
   - npm install -g elm
   - elm-package install -y
 script: elm make tests/MainTests.elm --output tests.js && node tests.js
 cache:
   directories:
-    - tests/elm-stuff/build-artifacts
+    - elm-stuff/build-artifacts
