@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/rrooding/thermostat-ui.svg?branch=master)](https://travis-ci.org/rrooding/thermostat-ui)
+
 This project was bootstrapped with [Create Elm App](https://github.com/halfzebra/create-elm-app).
 
 Below you will find some information on how to perform common tasks.  
