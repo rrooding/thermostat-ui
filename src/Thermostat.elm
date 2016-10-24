@@ -1,4 +1,4 @@
-module Thermostat exposing (Model, HvacMode(..), view)
+module Thermostat exposing (Model, HvacMode(..), view, angleToTick, tickToTemperature)
 
 import Html exposing (Html, div)
 import Svg exposing (Svg, circle, g, text, text', path, svg)
@@ -239,6 +239,22 @@ noTextSelectionStyle =
 --
 -- View elements
 --
+
+
+angleToTick : Float -> Int
+angleToTick angle =
+    angle
+        / (tickDegrees / numberOfTicks)
+        |> round
+
+
+tickToTemperature : Int -> Float
+tickToTemperature tickNumber =
+    let
+        temp =
+            (toFloat tickNumber) * (temperatureRange / numberOfTicks) + minimumTemperature
+    in
+        clamp minimumTemperature maximumTemperature ((toFloat (round (temp * 2))) / 2)
 
 
 dialTick : Int -> Int -> Int -> Svg msg
