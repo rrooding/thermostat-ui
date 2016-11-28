@@ -1,7 +1,7 @@
 module Thermostat exposing (Model, HvacMode(..), view, angleToTick, tickToTemperature)
 
 import Html exposing (Html, div)
-import Svg exposing (Svg, circle, g, text, text', path, svg)
+import Svg exposing (Svg, circle, g, text, text_, path, svg)
 import Svg.Attributes
     exposing
         ( id
@@ -125,7 +125,7 @@ view model attributes =
             []
         , dialTicks model
         , centeredText (displayTemperature model.targetTemperature)
-        , text'
+        , text_
             [ x (toString (ambientTextPosition model).x)
             , y (toString (ambientTextPosition model).y)
             , fill "white"
@@ -305,16 +305,16 @@ dialTicks model =
 
         max =
             round ((actualMaxValue - minimumTemperature) / temperatureRange * numberOfTicks)
+
+        list =
+            List.range 0 (round numberOfTicks - 1)
     in
-        g []
-            ([0..(round numberOfTicks - 1)]
-                |> List.map (dialTick min max)
-            )
+        g [] (List.map (dialTick min max) list)
 
 
 centeredText : String -> Svg msg
 centeredText content =
-    text'
+    text_
         [ x (toString radius)
         , y (toString radius)
         , fill "white"

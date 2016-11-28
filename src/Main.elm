@@ -1,7 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html)
-import Html.App exposing (program)
+import Html exposing (Html, program)
 import Platform.Cmd exposing ((!))
 import Task
 import TouchEvents as Touch exposing (Direction(..))
@@ -44,7 +43,7 @@ view model =
 
 initialWindowCenter : Cmd Msg
 initialWindowCenter =
-    Task.perform (\_ -> NoOp) updateWindowCenter Window.size
+    Task.perform updateWindowCenter Window.size
 
 
 updateWindowCenter : Window.Size -> Msg
@@ -107,7 +106,7 @@ update msg model =
             model ! []
 
 
-main : Program Never
+main : Program Never Model Msg
 main =
     program
         { init = init
