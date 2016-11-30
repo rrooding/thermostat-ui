@@ -301,7 +301,7 @@ dialTicks model =
         list =
             List.range 0 (round numberOfTicks - 1)
     in
-        g [] (List.map (dialTick min max) list)
+        g [] (List.map (dialTick min (max - 1)) list)
 
 
 centeredText : String -> Svg msg

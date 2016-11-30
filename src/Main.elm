@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Html exposing (Html, program)
+import Http exposing (post)
 import Phoenix.Channel
 import Phoenix.Socket
 import Platform.Cmd exposing ((!))
@@ -10,7 +11,7 @@ import Transform exposing (Point)
 import Thermostat exposing (view)
 import Window
 import Json.Encode as JE
-import Json.Decode as JD exposing (field)
+import Json.Decode as JD exposing (field, list, string)
 
 
 --
@@ -42,6 +43,7 @@ type Msg
     | PhoenixMsg (Phoenix.Socket.Msg Msg)
     | ReceiveThermostatUpdate JE.Value
     | JoinChannel
+    | UpdatedSetpoint (Result Http.Error (List String))
     | NoOp
 
 
@@ -53,8 +55,8 @@ type Msg
 
 endpoint : String
 endpoint =
-    -- "localhost:4000"
-    "192.168.2.117:4000"
+    --"192.168.2.117:4000"
+    "localhost:4000"
 
 
 channelServer : String
@@ -169,7 +171,7 @@ update msg model =
                 { model | thermostat = (updateSetpoint newTargetTemperature model.thermostat), lastTouchPositionY = Just touchEvent.clientY } ! []
 
         OnTouchEnd touchEvent ->
-            model ! []
+            model ! [ updateRemoteSetpoint model.thermostat.setpoint ]
 
         UpdateWindowCenter windowCenter ->
             { model | windowCenter = Just windowCenter } ! []
@@ -203,6 +205,12 @@ update msg model =
                 Err error ->
                     model ! []
 
+        UpdatedSetpoint (Ok _) ->
+            model ! []
+
+        UpdatedSetpoint (Err _) ->
+            model ! []
+
         NoOp ->
             model ! []
 
@@ -215,6 +223,27 @@ updateThermostat thermostat msg =
 updateSetpoint : Float -> Thermostat.Model -> Thermostat.Model
 updateSetpoint temperature model =
     { model | setpoint = temperature }
+
+
+remoteSetpointBody : Float -> String
+remoteSetpointBody temperature =
+    let
+        setpoint =
+            JE.object
+                [ ( "setpoint", JE.string (toString temperature) ) ]
+    in
+        JE.encode 0 setpoint
+
+
+updateRemoteSetpoint : Float -> Cmd Msg
+updateRemoteSetpoint temperature =
+    Http.send
+        UpdatedSetpoint
+        (Http.post
+            ("http://" ++ endpoint ++ "/api/setpoint")
+            (Http.stringBody "application/json" (remoteSetpointBody temperature))
+            (list string)
+        )
 
 
 subscriptions : Model -> Sub Msg
