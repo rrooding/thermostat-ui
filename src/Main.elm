@@ -40,7 +40,7 @@ init =
      , phxSocket = initPhxSocket
      }
     )
-        ! [ initialWindowCenter ]
+        ! [ Cmd.batch [ initialWindowCenter, joinChannel ] ]
 
 
 initPhxSocket : Phoenix.Socket.Socket Msg
@@ -52,13 +52,15 @@ initPhxSocket =
 
 view : Model -> Html Msg
 view model =
-    Html.div []
-        [ Html.button [ Html.Events.onClick JoinChannel ] [ Html.text "Join lobby" ]
-        , Thermostat.view model.thermostat
-            [ Touch.onTouchStart OnTouchStart
-            , Touch.onTouchMove OnTouchMove
-            ]
+    Thermostat.view model.thermostat
+        [ Touch.onTouchStart OnTouchStart
+        , Touch.onTouchMove OnTouchMove
         ]
+
+
+joinChannel : Cmd Msg
+joinChannel =
+    Task.perform (\_ -> JoinChannel) (Task.succeed 42)
 
 
 initialWindowCenter : Cmd Msg
