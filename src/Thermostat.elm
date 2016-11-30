@@ -1,4 +1,4 @@
-module Thermostat exposing (Model, HvacMode(..), view, angleToTick, tickToTemperature)
+module Thermostat exposing (Model, view, angleToTick, tickToTemperature)
 
 import Html exposing (Html, div)
 import Svg exposing (Svg, circle, g, text, text_, path, svg)
@@ -31,16 +31,11 @@ import Transform exposing (Point)
 --
 
 
-type HvacMode
-    = Heating
-    | Cooling
-    | Off
-
-
 type alias Model =
-    { targetTemperature : Float
-    , ambientTemperature : Float
-    , hvacMode : HvacMode
+    { setpoint : Float
+    , temperature : Float
+    , relativeHumidity : Float
+    , heating : Bool
     }
 
 
@@ -100,9 +95,9 @@ temperatureRange =
     maximumTemperature - minimumTemperature
 
 
-ambientTextShiftDegrees : Float
-ambientTextShiftDegrees =
-    6
+temperatureTextShiftDegrees : Float
+temperatureTextShiftDegrees =
+    9
 
 
 
@@ -119,15 +114,15 @@ view model attributes =
             [ cx (toString radius)
             , cy (toString radius)
             , r (toString radius)
-            , fill (dialColor model.hvacMode)
+            , fill (dialColor model.heating)
             , style "transition: fill 0.5s"
             ]
             []
         , dialTicks model
-        , centeredText (displayTemperature model.targetTemperature)
+        , centeredText (displayTemperature model.setpoint)
         , text_
-            [ x (toString (ambientTextPosition model).x)
-            , y (toString (ambientTextPosition model).y)
+            [ x (toString (temperatureTextPosition model).x)
+            , y (toString (temperatureTextPosition model).y)
             , fill "white"
             , textAnchor "middle"
             , alignmentBaseline "central"
@@ -135,7 +130,7 @@ view model attributes =
             , fontWeight "bold"
             , fontFamily "Helvetica, sans-serif"
             ]
-            [ text (displayTemperature model.ambientTemperature) ]
+            [ text (displayTemperature model.temperature) ]
         ]
 
 
@@ -145,23 +140,23 @@ view model attributes =
 --
 
 
-ambientTextShift : Model -> Float
-ambientTextShift model =
-    if model.ambientTemperature > model.targetTemperature then
-        ambientTextShiftDegrees
+temperatureTextShift : Model -> Float
+temperatureTextShift model =
+    if model.temperature > model.setpoint then
+        temperatureTextShiftDegrees
     else
-        -ambientTextShiftDegrees
+        -temperatureTextShiftDegrees
 
 
-ambientTextPosition : Model -> Point
-ambientTextPosition model =
+temperatureTextPosition : Model -> Point
+temperatureTextPosition model =
     let
         angle =
             tickDegrees
-                * (model.ambientTemperature - minimumTemperature)
+                * (model.temperature - minimumTemperature)
                 / temperatureRange
                 - offsetDegrees
-                + ambientTextShift model
+                + temperatureTextShift model
                 |> Transform.degreesToRadians
     in
         { x = radius
@@ -202,16 +197,13 @@ displayTemperature temperature =
     (toString temperature) ++ "°C"
 
 
-dialColor : HvacMode -> String
+dialColor : Bool -> String
 dialColor mode =
     case mode of
-        Heating ->
+        True ->
             "#E36304"
 
-        Cooling ->
-            "#007AF1"
-
-        Off ->
+        False ->
             "#222"
 
 
@@ -293,11 +285,11 @@ dialTicks : Model -> Svg msg
 dialTicks model =
     let
         actualMinValue =
-            List.minimum [ model.ambientTemperature, model.targetTemperature ]
+            List.minimum [ model.temperature, model.setpoint ]
                 |> Maybe.withDefault minimumTemperature
 
         actualMaxValue =
-            List.maximum [ model.ambientTemperature, model.targetTemperature ]
+            List.maximum [ model.temperature, model.setpoint ]
                 |> Maybe.withDefault maximumTemperature
 
         min =

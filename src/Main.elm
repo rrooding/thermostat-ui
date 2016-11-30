@@ -1,17 +1,21 @@
 module Main exposing (..)
 
 import Html exposing (Html, program)
-import Html.Events
 import Phoenix.Channel
 import Phoenix.Socket
 import Platform.Cmd exposing ((!))
 import Task
 import TouchEvents as Touch exposing (Direction(..))
 import Transform exposing (Point)
-import Thermostat exposing (HvacMode(..), view)
+import Thermostat exposing (view)
 import Window
 import Json.Encode as JE
 import Json.Decode as JD exposing (field)
+
+
+--
+-- Types
+--
 
 
 type alias Model =
@@ -22,9 +26,18 @@ type alias Model =
     }
 
 
+type alias ThermostatMessage =
+    { temperature : Float
+    , relative_humidity : Float
+    , setpoint : Float
+    , heating : Bool
+    }
+
+
 type Msg
     = OnTouchStart Touch.Touch
     | OnTouchMove Touch.Touch
+    | OnTouchEnd Touch.Touch
     | UpdateWindowCenter Point
     | PhoenixMsg (Phoenix.Socket.Msg Msg)
     | ReceiveThermostatUpdate JE.Value
@@ -32,22 +45,65 @@ type Msg
     | NoOp
 
 
-init : ( Model, Cmd Msg )
-init =
-    ({ lastTouchPositionY = Nothing
-     , windowCenter = Nothing
-     , thermostat = (Thermostat.Model 15.5 15 Off)
-     , phxSocket = initPhxSocket
-     }
-    )
-        ! [ Cmd.batch [ initialWindowCenter, joinChannel ] ]
+
+--
+-- Configuration
+--
+
+
+endpoint : String
+endpoint =
+    -- "localhost:4000"
+    "192.168.2.117:4000"
+
+
+channelServer : String
+channelServer =
+    "ws://" ++ endpoint ++ "/socket/websocket"
+
+
+channelTopic : String
+channelTopic =
+    "thermostat"
+
+
+
+--
+-- Phoenix Channel stuff
+--
 
 
 initPhxSocket : Phoenix.Socket.Socket Msg
 initPhxSocket =
-    Phoenix.Socket.init "ws://localhost:4000/socket/websocket"
+    Phoenix.Socket.init channelServer
         |> Phoenix.Socket.withDebug
-        |> Phoenix.Socket.on "new:msg" "thermostat:lobby" ReceiveThermostatUpdate
+        |> Phoenix.Socket.on "new:msg" channelTopic ReceiveThermostatUpdate
+
+
+thermostatDecoder : JD.Decoder ThermostatMessage
+thermostatDecoder =
+    JD.map4 ThermostatMessage
+        (field "temperature" JD.float)
+        (field "relative_humidity" JD.float)
+        (field "setpoint" JD.float)
+        (field "heating" JD.bool)
+
+
+joinChannel : Cmd Msg
+joinChannel =
+    -- Execute bogus task to trigger JoinChannel
+    Task.perform (\_ -> JoinChannel) (Task.succeed 42)
+
+
+init : ( Model, Cmd Msg )
+init =
+    ({ lastTouchPositionY = Nothing
+     , windowCenter = Nothing
+     , thermostat = (Thermostat.Model 10 10 0 False)
+     , phxSocket = initPhxSocket
+     }
+    )
+        ! [ Cmd.batch [ initialWindowCenter, joinChannel ] ]
 
 
 view : Model -> Html Msg
@@ -55,12 +111,8 @@ view model =
     Thermostat.view model.thermostat
         [ Touch.onTouchStart OnTouchStart
         , Touch.onTouchMove OnTouchMove
+        , Touch.onTouchEnd OnTouchEnd
         ]
-
-
-joinChannel : Cmd Msg
-joinChannel =
-    Task.perform (\_ -> JoinChannel) (Task.succeed 42)
 
 
 initialWindowCenter : Cmd Msg
@@ -75,11 +127,6 @@ updateWindowCenter windowSize =
             (\d -> (toFloat d) / 2)
     in
         UpdateWindowCenter (Point (centerOf windowSize.width) (centerOf windowSize.height))
-
-
-setTargetTemperature : Float -> Thermostat.Model -> Thermostat.Model
-setTargetTemperature temperature model =
-    { model | targetTemperature = temperature }
 
 
 angleOfTouchEvent : Model -> Touch.Touch -> Float
@@ -100,17 +147,6 @@ temperatureForAngle angle =
         |> Thermostat.tickToTemperature
 
 
-type alias ThermostatMessage =
-    { wow : String
-    }
-
-
-thermostatDecoder : JD.Decoder ThermostatMessage
-thermostatDecoder =
-    JD.map ThermostatMessage
-        (field "wow" JD.string)
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -121,7 +157,7 @@ update msg model =
                         |> (angleOfTouchEvent model)
                         |> temperatureForAngle
             in
-                { model | thermostat = (setTargetTemperature newTargetTemperature model.thermostat), lastTouchPositionY = Just touchEvent.clientY } ! []
+                { model | thermostat = (updateSetpoint newTargetTemperature model.thermostat), lastTouchPositionY = Just touchEvent.clientY } ! []
 
         OnTouchMove touchEvent ->
             let
@@ -130,7 +166,10 @@ update msg model =
                         |> (angleOfTouchEvent model)
                         |> temperatureForAngle
             in
-                { model | thermostat = (setTargetTemperature newTargetTemperature model.thermostat), lastTouchPositionY = Just touchEvent.clientY } ! []
+                { model | thermostat = (updateSetpoint newTargetTemperature model.thermostat), lastTouchPositionY = Just touchEvent.clientY } ! []
+
+        OnTouchEnd touchEvent ->
+            model ! []
 
         UpdateWindowCenter windowCenter ->
             { model | windowCenter = Just windowCenter } ! []
@@ -147,7 +186,7 @@ update msg model =
         JoinChannel ->
             let
                 channel =
-                    Phoenix.Channel.init "thermostat:lobby"
+                    Phoenix.Channel.init channelTopic
 
                 ( phxSocket, phxCmd ) =
                     Phoenix.Socket.join channel model.phxSocket
@@ -157,19 +196,25 @@ update msg model =
                 )
 
         ReceiveThermostatUpdate raw ->
-            let
-                a =
-                    Debug.log "aaa" "bb"
-            in
-                case JD.decodeValue thermostatDecoder raw of
-                    Ok thermostatMessage ->
-                        model ! []
+            case JD.decodeValue thermostatDecoder raw of
+                Ok msg ->
+                    { model | thermostat = (updateThermostat model.thermostat msg) } ! []
 
-                    Err error ->
-                        model ! []
+                Err error ->
+                    model ! []
 
         NoOp ->
             model ! []
+
+
+updateThermostat : Thermostat.Model -> ThermostatMessage -> Thermostat.Model
+updateThermostat thermostat msg =
+    { thermostat | temperature = msg.temperature, relativeHumidity = msg.relative_humidity, setpoint = msg.setpoint, heating = msg.heating }
+
+
+updateSetpoint : Float -> Thermostat.Model -> Thermostat.Model
+updateSetpoint temperature model =
+    { model | setpoint = temperature }
 
 
 subscriptions : Model -> Sub Msg
